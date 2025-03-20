@@ -1,11 +1,11 @@
 require("dotenv").config();
 const express = require("express");
-const sequelize = require("./config/database");
-const passport = require("./middlewares/passport");
 const authRoutes = require("./routes/auth");
 const googleAuthRoutes = require("./routes/googleAuth");
+const passport = require("./middlewares/passport");
 
 require("./models"); // Ensure models are loaded
+
 
 const app = express();
 app.use(passport.initialize());
@@ -16,6 +16,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/auth", googleAuthRoutes);
+
 
 // Sync all models and start the server
 
