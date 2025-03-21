@@ -13,7 +13,11 @@ passport.use(
     },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
-        const role = req.query.role; // Get role from query parameters
+        // Decode state parameter to get role
+        const state = req.query.state
+          ? JSON.parse(Buffer.from(req.query.state, "base64").toString())
+          : {};
+        const role = state.role;
 
         if (!role || !["listener", "author"].includes(role)) {
           return done(
@@ -49,6 +53,9 @@ passport.use(
           }
         }
 
+        // Explicitly attach role to user object before returning
+        user.role = role;
+
         done(null, user);
       } catch (error) {
         done(error, null);
@@ -56,5 +63,23 @@ passport.use(
     }
   )
 );
+
+passport.serializeUser((user, done) => {
+  done(null, { id: user.id, role: user.role });
+});
+
+passport.deserializeUser(async (obj, done) => {
+  try {
+    let user;
+    if (obj.role === "listener") {
+      user = await Listener.findByPk(obj.id);
+    } else if (obj.role === "author") {
+      user = await Author.findByPk(obj.id);
+    }
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
 
 module.exports = passport;
