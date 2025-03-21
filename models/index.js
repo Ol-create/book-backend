@@ -13,6 +13,14 @@ const sequelize = new Sequelize(
 
 const db = { sequelize, Sequelize };
 
-db.User = require("./user")(sequelize, DataTypes);
+db.Admin = require("./admin")(sequelize, DataTypes);
+db.Author = require("./author")(sequelize, DataTypes);
+db.Book = require("./book")(sequelize, DataTypes);
+db.Chapter = require("./chapter")(sequelize, DataTypes);
+db.Listener = require("./listener")(sequelize, DataTypes);
+db.Notification = require("./notification")(sequelize, DataTypes);
+db.Purchase = require("./purchase")(sequelize, DataTypes);
+db.Review = require("./review")(sequelize, DataTypes);
+
 
 module.exports = db;

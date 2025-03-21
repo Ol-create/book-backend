@@ -1,69 +1,77 @@
 const express = require("express");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-// const { User } = require("../models/user");
-const { User } = require("../models"); // Ensure this matches models/index.js
+const { Listener, Admin, Author } = require("../models"); // Import models
 require("dotenv").config();
 
 const router = express.Router();
 
-// User registration
+// User Registration (Listeners, Admins, Authors)
 router.post("/register", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
-    if (!email || !password) {
+    if (!email || !password || !role) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
+    let Model;
+    if (role === "listener") Model = Listener;
+    else if (role === "admin") Model = Admin;
+    else if (role === "author") Model = Author;
+    else return res.status(400).json({ message: "Invalid role specified" });
+
+    const existingUser = await Model.findOne({ where: { email } });
+    if (existingUser)
       return res.status(400).json({ message: "User already exists" });
-    }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = await User.create({
-    //   username,
+    const newUser = await Model.create({
       email,
       password_digest: hashedPassword,
     });
 
-    res.status(201).json({ message: "User registered successfully", user });
+    res.status(201).json({ message: "Registration successful", user: newUser });
   } catch (error) {
-    console.error("❌ Registration Error:", error); // Log the actual error
-    res
-      .status(500)
-      .json({ message: "Error registering user", error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-// User login
+// User Login
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ where: { email } });
+    const { email, password, role } = req.body;
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!email || !password || !role) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
-    const isMatch = await bcrypt.compare(password, user.password_digest);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    let Model;
+    if (role === "listener") Model = Listener;
+    else if (role === "admin") Model = Admin;
+    else if (role === "author") Model = Author;
+    else return res.status(400).json({ message: "Invalid role specified" });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    const user = await Model.findOne({ where: { email } });
+    if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
-    res.json({ message: "Login successful", token });
+    const passwordMatch = await bcrypt.compare(password, user.password_digest);
+    if (!passwordMatch)
+      return res.status(401).json({ message: "Invalid credentials" });
+
+    const token = jwt.sign({ id: user.id, role }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.status(200).json({ message: "Login successful", token });
   } catch (error) {
-    console.error("❌ Login Error:", error); // Log the actual error
-    res.status(500).json({ message: "Error logging in", error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
+});
+
+// Logout (Clears token on frontend)
+router.post("/logout", (req, res) => {
+  res.status(200).json({ message: "Logged out successfully" });
 });
 
 module.exports = router;
