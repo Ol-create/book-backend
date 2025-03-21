@@ -1,0 +1,30 @@
+"use strict";
+const { Model } = require("sequelize");
+
+module.exports = (sequelize, DataTypes) => {
+  class Admin extends Model {
+    static associate(models) {
+      Admin.hasMany(models.Notification, { foreignKey: "userId" });
+    }
+  }
+
+  Admin.init(
+    {
+      email: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+      },
+      password_digest: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+    },
+    {
+      sequelize,
+      modelName: "Admin",
+    }
+  );
+
+  return Admin;
+};
