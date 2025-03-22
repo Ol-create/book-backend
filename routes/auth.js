@@ -1,6 +1,9 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+// const crypto = require("crypto");
+
 const { Listener, Admin, Author } = require("../models"); // Import models
 require("dotenv").config();
 
@@ -41,7 +44,7 @@ router.post("/register", async (req, res) => {
     const verificationToken = jwt.sign(
       { email, role }, // Store both email and role
       process.env.JWT_SECRET,
-      { expiresIn: "24h" }
+      { expiresIn: "2m" }
     );
 
     // Create user (unverified)
@@ -102,6 +105,61 @@ router.get("/verify-email", async (req, res) => {
 
 
 
+// Resend Verification Email Route
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    if (!email || !role) {
+      return res.status(400).json({ message: "Email and role are required" });
+    }
+
+    let Model;
+    if (role === "listener") Model = Listener;
+    else if (role === "admin") Model = Admin;
+    else if (role === "author") Model = Author;
+    else return res.status(400).json({ message: "Invalid role specified" });
+
+    // Find the user
+    const user = await Model.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User is already verified" });
+    }
+
+    // Generate a new verification token
+    const verificationToken = jwt.sign(
+      { email, role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1m" }
+    );
+
+    // Update the user's verificationToken
+    user.verificationToken = verificationToken;
+    await user.save();
+
+    // Send new verification email
+    const verificationLink = `${process.env.BASE_URL}/auth/verify-email?token=${verificationToken}`;
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Resend Verification Email",
+      html: `<p>Click <a href="${verificationLink}">here</a> to verify your email.</p>`,
+    });
+
+    res
+      .status(200)
+      .json({ message: "Verification email resent successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+
+
 
 router.post("/login", async (req, res) => {
   try {
@@ -143,6 +201,7 @@ router.post("/login", async (req, res) => {
 router.post("/logout", (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
 });
+
 
 
 
