@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
-// const crypto = require("crypto");
+const rateLimit = require("express-rate-limit");
 
 const { Listener, Admin, Author } = require("../models"); // Import models
 require("dotenv").config();
@@ -105,8 +105,22 @@ router.get("/verify-email", async (req, res) => {
 
 
 
+
+// Rate limit: Allow 3 requests per hour per IP
+const resendEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Max 3 requests per hour
+  message: {
+    status: 429,
+    message: "Too many requests. Please try again in an hour.",
+  },
+  standardHeaders: true, 
+  legacyHeaders: false,
+});
+
+
 // Resend Verification Email Route
-router.post("/resend-verification", async (req, res) => {
+router.post("/resend-verification", resendEmailLimiter, async (req, res) => {
   try {
     const { email, role } = req.body;
     if (!email || !role) {
