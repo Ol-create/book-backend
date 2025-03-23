@@ -3,12 +3,18 @@ const express = require("express");
 const authRoutes = require("./routes/auth");
 const googleAuthRoutes = require("./routes/googleAuth");
 const passport = require("./middlewares/passport");
+const cors = require("cors");
 
 require("./models"); // Ensure models are loaded
 
 
 const app = express();
 app.use(passport.initialize());
+app.use(
+  cors({
+    origin: "http://localhost:8080",
+  })
+);
 
 const PORT = process.env.PORT || 5000;
 

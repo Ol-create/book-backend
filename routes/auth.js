@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const rateLimit = require("express-rate-limit");
 
@@ -209,6 +210,94 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
+
+
+
+//Request Password Reset
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email, role } = req.body;
+
+    if (!email || !role) {
+      return res.status(400).json({ message: "Email and role are required" });
+    }
+
+    let Model;
+    if (role === "listener") Model = Listener;
+    else if (role === "admin") Model = Admin;
+    else if (role === "author") Model = Author;
+    else return res.status(400).json({ message: "Invalid role specified" });
+
+    const user = await Model.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generate a password reset token (JWT)
+    const resetToken = jwt.sign(
+      { email, role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" } // Token expires in 15 minutes
+    );
+
+    // Send reset email
+    const resetLink = `${process.env.BASE_URL}/auth/reset-password?token=${resetToken}`;
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Reset Request",
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>`,
+    });
+
+    res.status(200).json({ message: "Password reset email sent successfully." });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+
+
+// frontend to handle GET /reset-password
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    // Verify the token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    const { email, role } = decoded;
+
+    let Model;
+    if (role === "listener") Model = Listener;
+    else if (role === "admin") Model = Admin;
+    else if (role === "author") Model = Author;
+    else return res.status(400).json({ message: "Invalid role specified" });
+
+    const user = await Model.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password_digest = hashedPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successful. You can now log in." });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 
 
 // Logout (Clears token on frontend)
